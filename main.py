@@ -1,62 +1,88 @@
 import json
+import random
+import time
 from playwright.sync_api import sync_playwright
 
 def run():
-    # Zara Ceket Linki
     url = "https://www.zara.com/tr/tr/kadin-ceket-l1114.html"
     data = []
 
-    print("🕵️‍♀️ ZARA'ya giriliyor...")
+    print("🥷 ZARA'ya Ninja Modunda Giriliyor...")
     
     with sync_playwright() as p:
-        # Tarayıcıyı daha "İnsan" gibi başlatıyoruz
-        browser = p.chromium.launch(headless=True, args=["--disable-blink-features=AutomationControlled"])
-        context = browser.new_context(
-            user_agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+        # 1. KAMUFLAJ: Tarayıcıyı özel argümanlarla başlat
+        browser = p.chromium.launch(
+            headless=True,
+            args=[
+                '--disable-blink-features=AutomationControlled', # Otomasyon izini sil
+                '--no-sandbox',
+                '--disable-setuid-sandbox',
+                '--disable-infobars',
+                '--window-position=0,0',
+                '--ignore-certifcate-errors',
+                '--ignore-certifcate-errors-spki-list',
+                '--user-agent=Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+            ]
         )
-        page = context.new_page()
         
+        # 2. KAMUFLAJ: Tarayıcı penceresi (Context) ayarları
+        context = browser.new_context(
+            viewport={'width': 1920, 'height': 1080},
+            user_agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            locale="tr-TR",
+            timezone_id="Europe/Istanbul"
+        )
+        
+        # 3. KAMUFLAJ: Robot izlerini JavaScript ile sil
+        page = context.new_page()
+        page.add_init_script("""
+            Object.defineProperty(navigator, 'webdriver', {
+                get: () => undefined
+            });
+        """)
+
         try:
-            page.goto(url, timeout=90000) # Süreyi uzattık
-            print("Siteye erişildi, bekleniyor...")
-            page.wait_for_timeout(10000) # 10 saniye bekle
+            # Siteye git
+            page.goto(url, timeout=90000, wait_until="domcontentloaded")
+            print("Siteye istek atıldı, bekleniyor...")
             
-            # NE GÖRÜYORUZ? FOTOĞRAF ÇEK! 📸
-            # Bu fotoğraf sayesinde sorunu anlayacağız.
-            page.screenshot(path="hata_resmi.png", full_page=True)
-            print("📸 Ekran görüntüsü alındı: hata_resmi.png")
-
-            # Farklı yöntemlerle ürün arayalım
-            # Yöntem 1: Standart Zara kartları
-            products = page.locator(".product-grid-product")
+            # Rastgele bekleme (İnsan taklidi)
+            time.sleep(random.uniform(5, 8))
             
-            # Yöntem 2: Link içeren herhangi bir liste elemanı
-            if products.count() == 0:
-                print("⚠️ Standart yöntem çalışmadı, alternatif deneniyor...")
-                products = page.locator("li:has(a[href*='/tr/tr/'])")
+            # Tekrar Fotoğraf Çek (Bakalım kandırabildik mi?)
+            page.screenshot(path="son_durum.png", full_page=True)
+            print("📸 Ekran görüntüsü alındı: son_durum.png")
 
-            count = products.count()
-            print(f"📦 {count} ürün bulundu!")
+            # Ürünleri bul
+            # Zara bazen CSS class'larını değiştirir, en genel yapıyı arayalım
+            products = page.locator("li").filter(has=page.locator("a[href*='/tr/tr/']")).all()
+            
+            print(f"📦 Tahmini {len(products)} adet kutu bulundu.")
 
-            for i in range(min(5, count)):
-                item = products.nth(i)
+            count = 0
+            for item in products:
+                if count >= 5: break # İlk 5 ürün
                 try:
-                    # Link
-                    link = item.locator("a").first.get_attribute("href")
-                    # Fiyat (Zara bazen fiyatı gizler, text content ile alalım)
-                    text_content = item.inner_text()
+                    # Linki bul
+                    link_el = item.locator("a").first
+                    link = link_el.get_attribute("href")
                     
-                    data.append({
-                        "sira": i+1,
-                        "link": link,
-                        "ham_veri": text_content[:100] # İlk 100 karakteri al
-                    })
+                    # Fiyatı bul (Metin olarak ne varsa al)
+                    text = item.inner_text()
+                    
+                    if "TL" in text and link:
+                        data.append({
+                            "sira": count + 1,
+                            "link": link,
+                            "ham_veri": text.replace("\n", " ")[:100]
+                        })
+                        count += 1
+                        print(f"   ✅ Ürün bulundu: {link[:30]}...")
                 except:
-                    pass
+                    continue
 
         except Exception as e:
-            print(f"Hata oluştu: {e}")
-            # Hata anında da çeksin
+            print(f"❌ Hata: {e}")
             page.screenshot(path="hata_resmi.png")
         
         browser.close()
@@ -64,7 +90,7 @@ def run():
     # Sonucu kaydet
     with open("sonuc.json", "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=4)
-    print("✅ İşlem bitti.")
+    print("🏁 İşlem tamamlandı.")
 
 if __name__ == "__main__":
     run()
