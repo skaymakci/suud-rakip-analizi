@@ -1,31 +1,66 @@
-name: Zara Robotu
+import json
+from playwright.sync_api import sync_playwright
 
-on:
-  workflow_dispatch: # Bu satır, butona basınca çalışsın demek
+def run():
+    # Zara Ceket Linki
+    url = "https://www.zara.com/tr/tr/kadin-ceket-l1114.html"
+    data = []
 
-jobs:
-  analiz_yap:
-    runs-on: ubuntu-latest
+    print("🕵️‍♀️ ZARA'ya Gizli Ajan Gönderiliyor...")
     
-    steps:
-      - name: Kodları Çek
-        uses: actions/checkout@v4
+    with sync_playwright() as p:
+        # MASKE TAKMA İŞLEMİ (User-Agent)
+        browser = p.chromium.launch(headless=True)
+        context = browser.new_context(
+            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/110.0.0.0 Safari/537.36"
+        )
+        page = context.new_page()
+        
+        try:
+            page.goto(url, timeout=60000)
+            
+            # Sayfanın yüklenmesi için 5 saniye bekle (İnsan gibi davran)
+            page.wait_for_timeout(5000)
+            
+            print(f"Sayfa Başlığı: {page.title()}")
 
-      - name: Python Kur
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.9'
+            # Ürünleri bulmayı dene (Farklı etiketler deniyoruz)
+            # Zara bazen class isimlerini değiştirir.
+            products = page.locator(".product-grid-product")
+            
+            # Eğer ilk yöntemle bulamazsa, ikinci yöntemi dene
+            if products.count() == 0:
+                print("⚠️ 1. Yöntem çalışmadı, 2. yöntem deneniyor...")
+                products = page.locator("li[data-productid]")
+            
+            count = products.count()
+            print(f"📦 Toplam {count} ürün bulundu!")
 
-      - name: Kütüphaneleri Yükle
-        run: |
-          pip install -r requirements.txt
-          python -m playwright install chromium
+            for i in range(min(5, count)):
+                item = products.nth(i)
+                try:
+                    # Bilgileri çek
+                    # Zara'da isim bazen linkin içindedir, bazen span'dadır.
+                    name = item.locator("a.product-link").get_attribute("href")
+                    price_text = item.locator(".price-current__amount, .money-amount__main").first.inner_text()
+                    
+                    data.append({
+                        "sira": i+1,
+                        "urun_linki": name,
+                        "fiyat": price_text
+                    })
+                except Exception as e:
+                    print(f"Ürün hatası: {e}")
 
-      - name: Robotu Çalıştır
-        run: python main.py
+        except Exception as e:
+            print(f"Genel Hata: {e}")
+        
+        browser.close()
 
-      - name: Sonucu Paketle
-        uses: actions/upload-artifact@v4
-        with:
-          name: zara-raporu
-          path: sonuc.json
+    # Sonucu kaydet
+    with open("sonuc.json", "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=4)
+    print("✅ İşlem tamamlandı.")
+
+if __name__ == "__main__":
+    run()
