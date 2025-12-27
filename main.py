@@ -1,5 +1,4 @@
 import json
-import time
 from playwright.sync_api import sync_playwright
 
 def run():
@@ -7,49 +6,65 @@ def run():
     url = "https://www.zara.com/tr/tr/kadin-ceket-l1114.html"
     data = []
 
-    print("🕵️‍♀️ ZARA'ya Gizli Ajan Gönderiliyor...")
+    print("🕵️‍♀️ ZARA'ya giriliyor...")
     
     with sync_playwright() as p:
-        # MASKE TAKMA (User-Agent)
-        browser = p.chromium.launch(headless=True)
+        # Tarayıcıyı daha "İnsan" gibi başlatıyoruz
+        browser = p.chromium.launch(headless=True, args=["--disable-blink-features=AutomationControlled"])
         context = browser.new_context(
-            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/110.0.0.0 Safari/537.36"
+            user_agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
         )
         page = context.new_page()
         
         try:
-            page.goto(url, timeout=60000)
-            print("Siteye girildi, bekleniyor...")
-            page.wait_for_timeout(5000) # 5 saniye bekle
+            page.goto(url, timeout=90000) # Süreyi uzattık
+            print("Siteye erişildi, bekleniyor...")
+            page.wait_for_timeout(10000) # 10 saniye bekle
             
-            # Ürünleri bul
+            # NE GÖRÜYORUZ? FOTOĞRAF ÇEK! 📸
+            # Bu fotoğraf sayesinde sorunu anlayacağız.
+            page.screenshot(path="hata_resmi.png", full_page=True)
+            print("📸 Ekran görüntüsü alındı: hata_resmi.png")
+
+            # Farklı yöntemlerle ürün arayalım
+            # Yöntem 1: Standart Zara kartları
             products = page.locator(".product-grid-product")
-            if products.count() == 0:
-                products = page.locator("li[data-productid]")
             
+            # Yöntem 2: Link içeren herhangi bir liste elemanı
+            if products.count() == 0:
+                print("⚠️ Standart yöntem çalışmadı, alternatif deneniyor...")
+                products = page.locator("li:has(a[href*='/tr/tr/'])")
+
             count = products.count()
             print(f"📦 {count} ürün bulundu!")
 
             for i in range(min(5, count)):
                 item = products.nth(i)
                 try:
-                    # Linki al
-                    link = item.locator("a.product-link").get_attribute("href")
-                    # Fiyatı al (Farklı etiketler deniyoruz)
-                    price = item.locator(".price-current__amount, .money-amount__main").first.inner_text()
+                    # Link
+                    link = item.locator("a").first.get_attribute("href")
+                    # Fiyat (Zara bazen fiyatı gizler, text content ile alalım)
+                    text_content = item.inner_text()
                     
-                    data.append({"urun": link, "fiyat": price})
+                    data.append({
+                        "sira": i+1,
+                        "link": link,
+                        "ham_veri": text_content[:100] # İlk 100 karakteri al
+                    })
                 except:
                     pass
 
         except Exception as e:
-            print(f"Hata: {e}")
+            print(f"Hata oluştu: {e}")
+            # Hata anında da çeksin
+            page.screenshot(path="hata_resmi.png")
         
         browser.close()
 
+    # Sonucu kaydet
     with open("sonuc.json", "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=4)
-    print("✅ Bitti.")
+    print("✅ İşlem bitti.")
 
 if __name__ == "__main__":
     run()
