@@ -1,47 +1,55 @@
 import json
+import time
 from playwright.sync_api import sync_playwright
 
 def run():
-    # Zara ceket kategorisi
+    # Zara Ceket Linki
     url = "https://www.zara.com/tr/tr/kadin-ceket-l1114.html"
     data = []
 
-    print("ZARA'ya gidiliyor...")
+    print("🕵️‍♀️ ZARA'ya Gizli Ajan Gönderiliyor...")
     
     with sync_playwright() as p:
-        # headless=True: tarayıcıyı gizli açar
+        # MASKE TAKMA (User-Agent)
         browser = p.chromium.launch(headless=True)
-        page = browser.new_page()
+        context = browser.new_context(
+            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/110.0.0.0 Safari/537.36"
+        )
+        page = context.new_page()
         
-        # Sayfaya git (60 saniye bekleme süresi)
-        page.goto(url, timeout=60000)
-        
-        # Yüklenmesini bekle
-        page.wait_for_load_state("networkidle")
-        
-        # Ürünleri bul
-        products = page.locator("ul.product-grid__product-list > li")
-        count = products.count()
-        print(f"Toplam {count} ürün bulundu.")
+        try:
+            page.goto(url, timeout=60000)
+            print("Siteye girildi, bekleniyor...")
+            page.wait_for_timeout(5000) # 5 saniye bekle
+            
+            # Ürünleri bul
+            products = page.locator(".product-grid-product")
+            if products.count() == 0:
+                products = page.locator("li[data-productid]")
+            
+            count = products.count()
+            print(f"📦 {count} ürün bulundu!")
 
-        # İlk 5 ürünü çek
-        for i in range(min(5, count)):
-            item = products.nth(i)
-            try:
-                name = item.locator(".product-grid-product-info__name").inner_text()
-                price = item.locator(".price-current__amount").inner_text()
-                
-                data.append({"urun": name, "fiyat": price})
-                print(f"Çekildi: {name}")
-            except:
-                pass
+            for i in range(min(5, count)):
+                item = products.nth(i)
+                try:
+                    # Linki al
+                    link = item.locator("a.product-link").get_attribute("href")
+                    # Fiyatı al (Farklı etiketler deniyoruz)
+                    price = item.locator(".price-current__amount, .money-amount__main").first.inner_text()
+                    
+                    data.append({"urun": link, "fiyat": price})
+                except:
+                    pass
+
+        except Exception as e:
+            print(f"Hata: {e}")
         
         browser.close()
 
-    # Sonucu kaydet
     with open("sonuc.json", "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=4)
-    print("Bitti! sonuc.json dosyası oluştu.")
+    print("✅ Bitti.")
 
 if __name__ == "__main__":
     run()
