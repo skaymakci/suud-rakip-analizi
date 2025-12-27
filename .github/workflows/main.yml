@@ -24,8 +24,10 @@ jobs:
       - name: Robotu Çalıştır
         run: python main.py
 
-      - name: Sonucu Paketle
+      - name: Sonucu ve Fotografi Paketle
         uses: actions/upload-artifact@v4
         with:
-          name: zara-raporu
-          path: sonuc.json
+          name: zara-dosyalari
+          path: |
+            sonuc.json
+            hata_resmi.png
