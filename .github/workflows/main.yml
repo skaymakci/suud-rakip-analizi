@@ -24,10 +24,11 @@ jobs:
       - name: Robotu Çalıştır
         run: python main.py
 
-      - name: Sonucu ve Fotografi Paketle
+      - name: Sonucu Paketle
         uses: actions/upload-artifact@v4
+        if: always()  # Hata olsa bile resimleri yükle demek
         with:
-          name: zara-dosyalari
+          name: kanit-dosyalari
           path: |
             sonuc.json
-            hata_resmi.png
+            *.png
