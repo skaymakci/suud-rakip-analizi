@@ -1,0 +1,31 @@
+name: Zara Robotu
+
+on:
+  workflow_dispatch: # Bu satır, butona basınca çalışsın demek
+
+jobs:
+  analiz_yap:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Kodları Çek
+        uses: actions/checkout@v4
+
+      - name: Python Kur
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+
+      - name: Kütüphaneleri Yükle
+        run: |
+          pip install -r requirements.txt
+          python -m playwright install chromium
+
+      - name: Robotu Çalıştır
+        run: python main.py
+
+      - name: Sonucu Paketle
+        uses: actions/upload-artifact@v4
+        with:
+          name: zara-raporu
+          path: sonuc.json
